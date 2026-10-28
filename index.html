@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Bioparque Monarca · Aventura en 3 estaciones</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --musgo: #12352c;
+      --bosque: #1d4d3f;
+      --monarca: #f28c28;
+      --miel: #f6b73c;
+      --papel: #fff6e3;
+      --tinta: #1f2a24;
+      --suave: #5d6b62;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: var(--musgo);
+      color: var(--papel);
+      font-family: "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+      overscroll-behavior: none;
+      overflow: hidden;
+    }
+    header { text-align: center; line-height: 1.1; }
+    header h1 { margin: 0; font-size: clamp(1.1rem, 3vw, 1.5rem); font-weight: 600; }
+    header p { margin: 2px 0 0; font-size: .85rem; opacity: .75; }
+
+    #stage {
+      position: relative;
+      width: min(calc(100vw - 16px), 900px, calc((100vh - 96px) * 1.607));
+      width: min(calc(100vw - 16px), 900px, calc((100dvh - 96px) * 1.607));
+      aspect-ratio: 900 / 560;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+    /* Pantallas superpuestas (menú, intro, datos curiosos, resultados) */
+    #overlay {
+      position: absolute; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      padding: 10px; overflow: auto;
+      background: rgba(8, 24, 18, .78);
+    }
+    #overlay.show { display: flex; }
+    .panel {
+      width: 100%; max-width: 640px; max-height: 100%; overflow: auto;
+      background: var(--papel); color: var(--tinta);
+      border-radius: 20px; padding: 18px 22px; text-align: center;
+      border: 4px solid var(--monarca);
+    }
+    .panel h1, .panel h2 { margin: 0 0 4px; font-weight: 600; }
+    .panel h1 { font-size: clamp(1.5rem, 5vw, 2.1rem); }
+    .panel h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); }
+    .panel p { margin: 6px 0; line-height: 1.4; }
+    .sub { color: var(--suave); }
+    .small { font-size: .88rem; color: var(--suave); }
+    .big-emoji { font-size: 3rem; line-height: 1; }
+    .stars { font-size: 2rem; color: var(--monarca); letter-spacing: 4px; }
+
+    .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+    .btn {
+      font: inherit; font-weight: 600; font-size: 1rem;
+      padding: 10px 20px; border-radius: 999px; border: 0; cursor: pointer;
+      background: var(--monarca); color: #fff;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn.ghost { background: transparent; color: var(--bosque); border: 2px solid var(--bosque); }
+    .btn:focus-visible, .card:focus-visible { outline: 3px solid var(--bosque); outline-offset: 2px; }
+
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 6px; }
+    .card {
+      font: inherit; color: var(--tinta); cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 10px 6px; border-radius: 14px; background: #fff; border: 2px solid #ead9b8;
+    }
+    .card:hover { border-color: var(--monarca); }
+    .card b { font-size: 1.05rem; }
+    .card small { color: var(--suave); }
+    .card .ce { font-size: 2.2rem; line-height: 1.1; }
+    .card .st { color: var(--monarca); letter-spacing: 2px; }
+
+    .fact { text-align: left; background: #fff; border-radius: 12px; padding: 8px 12px; margin: 6px 0; border-left: 5px solid var(--miel); }
+    .fact.locked { opacity: .55; border-left-color: #bbb; }
+    .fact b { display: block; }
+    .badge { display: inline-block; background: var(--miel); color: var(--tinta); font-weight: 600; padding: 2px 12px; border-radius: 999px; font-size: .85rem; }
+
+    /* Botón de pausa táctil */
+    #pauseBtn {
+      position: absolute; right: 8px; top: calc(8% + 4px); z-index: 2;
+      width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
+      background: rgba(0, 0, 0, .38); color: #fff; font-size: 1.1rem;
+    }
+    #pauseBtn[hidden] { display: none; }
+
+    /* Aviso para girar el teléfono (el juego es horizontal) */
+    #rotate {
+      position: fixed; inset: 0; z-index: 50; display: none;
+      flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      background: var(--musgo); text-align: center; padding: 24px; font-size: 1.15rem;
+    }
+    #rotate span { font-size: 3.5rem; }
+    @media (orientation: portrait) and (max-width: 700px) { #rotate { display: flex; } }
+
+    /* Teléfonos en horizontal: todo más compacto y a pantalla casi completa */
+    @media (max-height: 520px) {
+      body { padding: 4px; gap: 0; }
+      header { display: none; }
+      #stage {
+        width: min(calc(100vw - 8px), calc((100vh - 8px) * 1.607));
+        width: min(calc(100vw - 8px), calc((100dvh - 8px) * 1.607));
+        border-radius: 10px;
+      }
+      .panel { padding: 10px 16px; border-width: 3px; border-radius: 14px; }
+      .panel h1 { font-size: 1.35rem; }
+      .panel h2 { font-size: 1.15rem; }
+      .panel p { margin: 3px 0; font-size: .85rem; line-height: 1.3; }
+      .big-emoji { font-size: 2rem; }
+      .stars { font-size: 1.5rem; }
+      .cards { margin: 8px 0 4px; gap: 8px; }
+      .card { padding: 6px 4px; }
+      .card .ce { font-size: 1.7rem; }
+      .card b { font-size: .95rem; }
+      .card small { font-size: .75rem; }
+      .btn { padding: 8px 16px; font-size: .95rem; }
+      .row { margin-top: 8px; }
+      .fact { font-size: .85rem; padding: 6px 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🦋 Bioparque Monarca</h1>
+    <p>Prototipo educativo · Aventura en 3 estaciones</p>
+  </header>
+
+  <div id="stage">
+    <canvas id="game" width="900" height="560" aria-label="Área de juego"></canvas>
+    <button id="pauseBtn" aria-label="Pausar" hidden>⏸</button>
+    <div id="overlay" role="dialog" aria-live="polite"></div>
+  </div>
+
+  <div id="rotate"><span>📱↻</span>Gira tu teléfono en horizontal para jugar</div>
+
+  <script src="game.js"></script>
+</body>
+</html>
